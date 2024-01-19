@@ -650,7 +650,7 @@ Resources:
         - !Ref AWS::NoValue
       RetentionInDays: !Ref pLambdaLogGroupRetention
 
-  rshieldOrgLambdaRole:
+  rShieldOrgLambdaRole:
     Type: AWS::IAM::Role
     Metadata:
       cfn_nag:
@@ -841,7 +841,7 @@ Resources:
         - [arm64]
         - !Ref AWS::NoValue
       Handler: app.lambda_handler
-      Role: !GetAtt rshieldOrgLambdaRole.Arn
+      Role: !GetAtt rShieldOrgLambdaRole.Arn
       MemorySize: 512
       Runtime: python3.9
       Timeout: 900
@@ -1149,4 +1149,4 @@ Outputs:
     Value: !GetAtt rshieldOrgLambdaLogGroup.Arn
   oshieldOrgLambdaRoleArn:
     Description: SRA shield Lambda Role ARN
-    Value: !GetAtt rshieldOrgLambdaRole.Arn
+    Value: !GetAtt rShieldOrgLambdaRole.Arn

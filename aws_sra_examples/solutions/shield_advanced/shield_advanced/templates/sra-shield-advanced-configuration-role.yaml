@@ -44,7 +44,7 @@ Parameters:
   pShieldOrgLambdaRoleName:
     AllowedPattern: '^[\w+=,.@-]{1,64}$'
     ConstraintDescription: Max 64 alphanumeric characters. Also special characters supported [+, =, ., @, -]
-    Default: sra-shield-advanced-lambda
+    Default: sra-shield-org-lambda
     Description: Lambda Role Name
     Type: String
   pShieldConfigurationRoleName:
@@ -76,11 +76,11 @@ Resources:
         Statement:
           - Effect: Allow
             Action: sts:AssumeRole
-            # UNCOMMENT
+            # COMMENT condition to test locally
             # Condition:
             #   StringEquals:
             #     aws:PrincipalArn:
-            #       - !Sub arn:${AWS::Partition}:iam::${pManagementAccountId}:role/${pShieldOrgLambdaRoleName}
+            #       - !Sub arn:${AWS::Partition}:iam::${pManagementAccountId}:*/${pShieldOrgLambdaRoleName}/*
             Principal:
               AWS:
                 - !Sub arn:${AWS::Partition}:iam::${pManagementAccountId}:root
@@ -95,31 +95,24 @@ Resources:
                 Action: organizations:ListAccounts
                 Resource: '*'
 
-        - PolicyName: sra-shield-read-only
+        - PolicyName: sra-shield-resources
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Sid: OrganizationsListAccounts
                 Effect: Allow
                 Action:
-                  - cloudfront:List*
-                  - elasticloadbalancing:List*
-                  - route53:List*
-                  - cloudfront:Describe*
-                  - elasticloadbalancing:Describe*
-                  - route53:Describe*
                   - route53:GetHostedZone
-                  - cloudwatch:Describe*
-                  - cloudwatch:Get*
-                  - cloudwatch:List*
-                  - cloudfront:GetDistribution*
+                  # - cloudwatch:Describe*
+                  # - cloudwatch:Get*
+                  # - cloudwatch:List*
+                  - cloudfront:GetDistribution
                   - globalaccelerator:ListAccelerators
                   - globalaccelerator:DescribeAccelerator
                 Resource:
-                  - !Sub arn:${AWS::Partition}:elasticloadbalancing:*:*:*
                   - !Sub arn:${AWS::Partition}:cloudfront::*:*
                   - !Sub arn:${AWS::Partition}:route53:::hostedzone/*
-                  - !Sub arn:${AWS::Partition}:cloudwatch:*:*:*:*
+                  #- !Sub arn:${AWS::Partition}:cloudwatch:*:*:*:*
                   - !Sub arn:${AWS::Partition}:globalaccelerator::*:*
 
         - PolicyName: sra-shield-advanced-policy
@@ -133,8 +126,10 @@ Resources:
                   - shield:DeleteProtection
                   - shield:DeleteProtectionGroup
                   - shield:DisassociateHealthCheck
-                  - shield:DeleteCreateProtectionGroup
+                  - shield:CreateProtectionGroup
+                  - shield:DeleteProtection
                   - shield:DeleteProtectionGroup
+                  - shield:DescribeProtection
                   - shield:DescribeProtectionGroup
                   - shield:UpdateProtectionGroup
                   - shield:ListProtectionGroups
@@ -159,11 +154,13 @@ Resources:
                   - shield:CreateSubscription
                   - shield:DeleteSubscription
                   - shield:DisableProactiveEngagement
-                  - shield:Describe*
+                  - shield:DescribeSubscription
+                  #- shield:Describe*
                   - shield:DisassociateDRTLogBucket
                   - shield:DisassociateDRTRole
                   - shield:DisableApplicationLayerAutomaticResponse
-                  - elasticloadbalancing:DescribeLoadBalancers
+                  - shield:DescribeEmergencyContactSettings
+                  # - elasticloadbalancing:DescribeLoadBalancers
                   - shield:EnableProactiveEngagement
                   - shield:EnableApplicationLayerAutomaticResponse
                   - shield:UpdateEmergencyContactSettings
@@ -171,8 +168,8 @@ Resources:
                   - shield:UpdateApplicationLayerAutomaticResponse
                   - shield:ListProtections
                   - shield:ListResourcesInProtectionGroup
-                  - shield:Get*
-                  - shield:List*
+                  #- shield:Get*
+                  #- shield:List*
                 Resource: '*'
 
         - PolicyName: sra-shield-dependant-iam-actions
@@ -187,6 +184,7 @@ Resources:
                   - s3:DeleteBucketPolicy
                   - s3:ListAllMyBuckets
                   - route53:ListHostedZones
+                  - elasticloadbalancing:DescribeLoadBalancers
                 Resource: '*'
 
         - PolicyName: sra-shield-advanced-policy-iam
