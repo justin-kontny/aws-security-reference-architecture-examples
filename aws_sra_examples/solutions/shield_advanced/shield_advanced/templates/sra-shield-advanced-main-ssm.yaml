@@ -42,7 +42,6 @@ Metadata:
           - pShieldAutoRenew
           - pShieldDRTLogBuckets
           - pShieldDRTRoleName
-          - pShieldDRTEmergencyContacts
           - pShieldWarning
 
       - Label:
@@ -139,8 +138,6 @@ Metadata:
         default: Comma delimited list of up to 10 flow logs buckets to give access to the DDOS Response Team
       pShieldDRTRoleName:
         default: Role name used by the DDOS response team
-      pShieldDRTEmergencyContacts:
-        default: Comma delimited list of email addresses
       pShieldWarning:
         default: Acknowledge Shield Terms and Conditions
       pRootOrganizationalUnitId:
@@ -231,7 +228,6 @@ Parameters:
     Description: Allow the DDOS response team access to the AWS account(s)
     Type: String
   pResourcesToProtect:
-    #Default: ''
     Description:
       Enables AWS Shield Advanced for a specific AWS resource. The resource can be an Amazon CloudFront distribution, Elastic Load Balancing load
       balancer, Elastic IP Address, or an Amazon Route 53 hosted zone.
@@ -258,14 +254,7 @@ Parameters:
     AllowedPattern: '^((?!xn--)(?!.*-s3alias$)[a-z0-9][a-z0-9-]{1,61}[a-z0-9])$'
     ConstraintDescription:
       'A comma-separated list of AWS S3 buckets without spaces to give the DRT Team access to e.g., "samplebucket1,samplebucket2"'
-    #Default: ''
     Description: A list of up to 10 S3 bucket names per account to give the DDOS Response team access to flow logs
-    Type: CommaDelimitedList
-  pShieldDRTEmergencyContacts:
-    AllowedPattern: '^$|^([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)$'
-    ConstraintDescription: 'A comma-separated list of email addresses for the DRT Team to contact to e.g., "test1@acme.com,test2@acme.com"'
-    #Default: ''
-    Description: A list of email addresses for emergency contacts for the DDOS response team to reach out to in the event of an attack
     Type: CommaDelimitedList
   pShieldWarning:
     AllowedValues: ['Accept', 'Reject']
@@ -699,9 +688,6 @@ Resources:
         pShieldDRTLogBuckets: !Join
           - ','
           - !Ref pShieldDRTLogBuckets
-        pShieldDRTEmergencyContacts: !Join
-          - ','
-          - !Ref pShieldDRTEmergencyContacts
       Tags:
         - Key: sra-solution
           Value: !Ref pSRASolutionName

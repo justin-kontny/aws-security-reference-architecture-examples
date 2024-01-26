@@ -27,9 +27,6 @@ if TYPE_CHECKING:
     from mypy_boto3_organizations import OrganizationsClient
     from mypy_boto3_shield import ShieldClient
 
-    # from mypy_boto3_shield.type_defs import A
-    from mypy_boto3_sns import SNSClient
-    from mypy_boto3_sns.type_defs import PublishBatchResponseTypeDef
 
 LOGGER = logging.getLogger("sra")
 log_level: str = os.environ.get("LOG_LEVEL", "ERROR")
@@ -37,16 +34,12 @@ LOGGER.setLevel(log_level)
 
 UNEXPECTED: str = "Unexpected!"
 SERVICE_NAME: str = "shield.amazonaws.com"
-SNS_PUBLISH_BATCH_MAX: int = 10
-
 
 helper = CfnResource(json_logging=True, log_level=log_level, boto_level="CRITICAL", sleep_on_delete=120)
-
 
 try:
     MANAGEMENT_ACCOUNT_SESSION = boto3.Session()
     ORG_CLIENT: OrganizationsClient = MANAGEMENT_ACCOUNT_SESSION.client("organizations")
-    SNS_CLIENT: SNSClient = MANAGEMENT_ACCOUNT_SESSION.client("sns")
 except Exception:
     LOGGER.exception(UNEXPECTED)
     raise ValueError("Unexpected error executing Lambda function. Review CloudWatch logs for details.") from None
@@ -134,7 +127,6 @@ def get_validated_parameters(event: Dict[str, Any]) -> dict:
     actions = {"Create": "Add", "Update": "Update", "Delete": "Remove"}
     params["action"] = actions[event.get("RequestType", "Create")]
     true_false_pattern = r"^true|false$"
-    sns_topic_pattern = r"^arn:(aws[a-zA-Z-]*){1}:sns:[a-z0-9-]+:\d{12}:[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
     protection_group_id_pattern = r"^[a-zA-Z0-9]{0,64}$|^$"
     protection_group_resource_type_pattern = r"^(CLOUDFRONT_DISTRIBUTION|ROUTE_53_HOSTED_ZONE|ELASTIC_IP_ALLOCATION|CLASSIC_LOAD_BALANCER|APPLICATION_LOAD_BALANCER|GLOBAL_ACCELERATOR)?$|^$"
     protection_group_pattern_pattern = r"^(ALL|ARBITRARY|BY_RESOURCE_TYPE)?$|^$"
@@ -188,13 +180,6 @@ def get_validated_parameters(event: Dict[str, Any]) -> dict:
     )
     params.update(
         parameter_pattern_validator(
-            "SHIELD_DRT_EMERGENCY_CONTACTS",
-            os.environ.get("SHIELD_DRT_EMERGENCY_CONTACTS"),
-            pattern=r"^(?:(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})+(,\s*(?:(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})+)*$",
-        )
-    )
-    params.update(
-        parameter_pattern_validator(
             "CONTROL_TOWER_REGIONS_ONLY",
             os.environ.get("CONTROL_TOWER_REGIONS_ONLY"),
             pattern=true_false_pattern,
@@ -214,7 +199,6 @@ def get_validated_parameters(event: Dict[str, Any]) -> dict:
             pattern=r"^\d{12}$",
         )
     )
-    params.update(parameter_pattern_validator("SNS_TOPIC_ARN", os.environ.get("SNS_TOPIC_ARN"), pattern=sns_topic_pattern))
 
     params.update(
         parameter_pattern_validator(

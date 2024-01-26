@@ -14,15 +14,15 @@ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-
 
 ## Introduction
 
-The shield Organization solution will automate enabling Amazon shield by delegating administration to an account (e.g. Audit or Security Tooling) and configuring shield for all the existing and future AWS Organization accounts.
+The Shield Advanced solution will automate enabling Amazon Shield Advanced by deploying and configuring for the chosen AWS accounts or all the existing and future AWS Organization accounts.
 
 **Key solution features:**
 
-- Delegates shield administration to another account (i.e Audit account).
+- Deploys to all accounts or specified accounts within an AWS Organization
 - Assumes a role in the delegated administrator account to configure organizations management.
-- Adds all existing accounts including the `management account` as members.
-- Configures a region aggregator within the `Home region`.
-- Assumes a role in each member account to enable/disable standards aligning with the delegated administrator account.
+- Configures up to 5 Protection Groups.
+- Dynamically figures out which S3 buckets belong to which account.
+- Assumes a role in each account to configure Shield Advanced.
 - Ability to disable shield within all accounts and regions via a parameter and CloudFormation update event.
 
 ---
@@ -47,47 +47,39 @@ The shield Organization solution will automate enabling Amazon shield by delegat
 
 #### 1.3 Regional Event Rules<!-- omit in toc -->
 
-- The `AWS Control Tower Lifecycle Event Rule` triggers the `AWS Lambda Function` when a new AWS Account is provisioned through AWS Control Tower.
 - The `Organization Compliance Scheduled Event Rule` triggers the `AWS Lambda Function` to capture AWS Account status updates (e.g. suspended to active).
   - A parameter is provided to set the schedule frequency.
   - See the [Instructions to Manually Run the Lambda Function](#instructions-to-manually-run-the-lambda-function) for triggering the `AWS Lambda Function` before the next scheduled run time.
-- The `AWS Organizations Event Rule` triggers the `AWS Lambda Function` when updates are made to accounts within the organization.
-  - When AWS Accounts are added to the AWS Organization outside of the AWS Control Tower Account Factory. (e.g. account created via AWS Organizations console, account invited from another AWS Organization).
-  - When tags are added or updated on AWS Accounts.
 
 #### 1.4 Global Event Rules<!-- omit in toc -->
 
 - If the `Home Region` is different from the `Global Region (e.g. us-east-1)`, then global event rules are created within the `Global Region` to forward events to the `Home Region` default Event Bus.
 - The `AWS Organizations Event Rule` forwards AWS Organization account update events.
 
-#### 1.5 SNS Topic<!-- omit in toc -->
-
-- SNS Topic used to fanout the Lambda function for configuring the service within each region.
-
-#### 1.6 Dead Letter Queue (DLQ)<!-- omit in toc -->
+#### 1.5 Dead Letter Queue (DLQ)<!-- omit in toc -->
 
 - SQS dead letter queue used for retaining any failed Lambda events.
 
-#### 1.7 AWS Lambda Function<!-- omit in toc -->
+#### 1.6 AWS Lambda Function<!-- omit in toc -->
 
 - The Lambda function includes logic to enable and configure shield.
 
-#### 1.8 Lambda CloudWatch Log Group<!-- omit in toc -->
+#### 1.7 Lambda CloudWatch Log Group<!-- omit in toc -->
 
 - All the `AWS Lambda Function` logs are sent to a CloudWatch Log Group `</aws/lambda/<LambdaFunctionName>` to help with debugging and traceability of the actions performed.
 - By default the `AWS Lambda Function` will create the CloudWatch Log Group and logs are encrypted with a CloudWatch Logs service managed encryption key.
 - Parameters are provided for changing the default log group retention and encryption KMS key.
 
-#### 1.9 Alarm SNS Topic<!-- omit in toc -->
+#### 1.8 Alarm SNS Topic<!-- omit in toc -->
 
 - SNS Topic used to notify subscribers when messages hit the DLQ.
 
-#### 1.10 shield<!-- omit in toc -->
+#### 1.9 shield<!-- omit in toc -->
 
 - The shield delegated administrator is registered within organizations in the `management account` using the shield APIs within each provided region.
 - EC2, ECR, Lambda standard and Lambda code scanning is set to be auto-enabled for all associated member accounts (newly associated and newly created accounts)
 
-#### 1.11 Lambda Layer<!-- omit in toc -->
+#### 1.10 Lambda Layer<!-- omit in toc -->
 
 - The python boto3 SDK lambda layer to enable capability for lambda to enable all elements of the shield service.
 - This is downloaded during the deployment process and packaged into a layer that is used by the lambda function in this solution.
@@ -156,12 +148,6 @@ In the `management account (home region)`, launch an AWS CloudFormation **Stack*
 
   ```bash
   aws cloudformation deploy --template-file $HOME/aws-sra-examples/aws_sra_examples/solutions/shield/shield_org/templates/sra-shield-advanced-main-ssm.yaml --stack-name sra-shield-advanced-main-ssm --capabilities CAPABILITY_NAMED_IAM
-  ```
-
-- **Option 2:** Use the [sra-shield-advanced-main.yaml](templates/sra-shield-advanced-main.yaml) template. Input is required for the CloudFormation parameters where the default is not set.
-
-  ```bash
-  aws cloudformation deploy --template-file $HOME/aws-sra-examples/aws_sra_examples/solutions/shield/shield_org/templates/sra-shield-advanced-main.yaml --stack-name sra-shield-advanced-main --capabilities CAPABILITY_NAMED_IAM --parameter-overrides pAuditAccountId=<AUDIT_ACCOUNT_ID> pOrganizationId=<ORGANIZATION_ID> pRootOrganizationalUnitId=<ROOT_ORGANIZATIONAL_UNIT_ID> pSRAStagingS3BucketName=<SRA_STAGING_S3_BUCKET_NAME>
   ```
 
 #### Verify Solution Deployment<!-- omit in toc -->

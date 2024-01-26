@@ -40,7 +40,6 @@ Metadata:
           - pShieldAutoRenew
           - pShieldDRTLogBuckets
           - pShieldDRTRoleName
-          - pShieldDRTEmergencyContacts
           - pShieldWarning
           - pShieldEnableProactiveEngagement
           - pShieldProactiveEngagementPhoneNumber
@@ -105,8 +104,6 @@ Metadata:
         default: Comma delimited list of up to 10 flow logs buckets to give access to the DDOS Response Team
       pShieldDRTRoleName:
         default: Role name used by the DDOS response team
-      pShieldDRTEmergencyContacts:
-        default: Comma delimited list of email addresses
       pShieldWarning:
         default: Acknowledge Shield Terms and Conditions
       pConfigureDRTTeamAccess:
@@ -277,14 +274,7 @@ Parameters:
     AllowedPattern: '^((?!xn--)(?!.*-s3alias$)[a-z0-9][a-z0-9-]{1,61}[a-z0-9])$'
     ConstraintDescription:
       'A comma-separated list of AWS S3 buckets without spaces to give the DRT Team access to e.g., "samplebucket1,samplebucket2"'
-    #Default: ''
     Description: A list of up to 10 S3 bucket names per account to give the DDOS Response team access to flow logs
-    Type: CommaDelimitedList
-  pShieldDRTEmergencyContacts:
-    AllowedPattern: '^$|^([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)$'
-    ConstraintDescription: 'A comma-separated list of email addresses for the DRT Team to contact to e.g., "test1@acme.com,test2@acme.com"'
-    #Default: ''
-    Description: A list of email addresses for emergency contacts for the DDOS response team to reach out to in the event of an attack
     Type: CommaDelimitedList
   pShieldWarning:
     AllowedValues: ['Accept', 'Reject']
@@ -302,12 +292,6 @@ Parameters:
     Default: sra-execution
     Description: The execution role name that is used in the stack.
     Type: String
-  # pAuditAccountId:
-  #   AllowedPattern: '^([\w.-]{1,900})$|^(\/[\w.-]{1,900})*[\w.-]{1,900}$'
-  #   ConstraintDescription:
-  #     Must be alphanumeric or special characters [., _, -]. In addition, the slash character ( / ) used to delineate hierarchies in parameter names.
-  #   Description: SSM Parameter for AWS Account ID of the Control Tower account to delegate administration.
-  #   Type: String
   pComplianceFrequency:
     ConstraintDescription: Compliance Frequency must be a number between 1 and 30, inclusive.
     Default: 7
@@ -427,7 +411,6 @@ Parameters:
     ConstraintDescription:
       List of ARNs of resources to include in the protection group. You must set this when you set Pattern to ARBITRARY and you must not set it for
       any other Pattern setting.
-    #Default: ''
     Description:
       The Amazon Resource Names (ARNs) of the resources to include in the protection group. You must set this when you set Pattern to ARBITRARY and
       you must not set it for any other Pattern setting.
@@ -637,7 +620,7 @@ Conditions:
   cNotGlobalRegionUsEast1: !Not [!Equals [!Ref 'AWS::Region', us-east-1]]
 
 Resources:
-  rshieldOrgLambdaLogGroup:
+  rShieldOrgLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Condition: cCreateLambdaLogGroup
     DeletionPolicy: Retain
@@ -695,22 +678,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sra*'
 
-        # - PolicyName: sra-shield-advanced-policy-shield
-        #   PolicyDocument:
-        #     Version: 2012-10-17
-        #     Statement:
-        #       - Sid: AllowAllTest
-        #         Effect: Allow
-        #         Action:
-        #           - shield:ListDelegatedAdminAccounts
-        #           - shield:DisableDelegatedAdminAccount
-        #           - shield:BatchGetAccountStatus
-        #           - shield:EnableDelegatedAdminAccount
-        #           - shield:Enable
-        #           - shield:Disable
-        #         Resource: '*'
-
-        - PolicyName: sra-shield-advanced-policy-iam
+        - PolicyName: sra-shield-sts
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -728,23 +696,10 @@ Resources:
                 Action: iam:GetRole
                 Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*
 
-              - Sid: AllowCreateServiceLinkedRole
-                Effect: Allow
-                Action: iam:CreateServiceLinkedRole
-                Condition:
-                  StringLike:
-                    iam:AWSServiceName: shield.amazonaws.com
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/shield.amazonaws.com/AWSServiceRoleForAmazonShield
-
               - Sid: AllowPolicyActions
                 Effect: Allow
                 Action: iam:PutRolePolicy
                 Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/shield.amazonaws.com/AWSServiceRoleForAmazonShield
-
-              - Sid: AllowDeleteServiceLinkedRole
-                Effect: Allow
-                Action: iam:DeleteServiceLinkedRole
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/shield.amazonaws.com/AWSServiceRoleForAmazonshield
 
         - PolicyName: sra-shield-advanced-policy-logs
           PolicyDocument:
@@ -771,37 +726,6 @@ Resources:
                   - organizations:ListDelegatedAdministrators
                 Resource: '*'
 
-              - Sid: AWSServiceAccess
-                Effect: Allow
-                Action:
-                  - organizations:DisableAWSServiceAccess
-                  - organizations:EnableAWSServiceAccess
-                Condition:
-                  StringLikeIfExists:
-                    organizations:ServicePrincipal: shield.amazonaws.com
-                Resource: '*'
-
-              - Sid: RegisterDeregisterDelegatedAdministrator
-                Effect: Allow
-                Action:
-                  - organizations:DeregisterDelegatedAdministrator
-                  - organizations:RegisterDelegatedAdministrator
-                Condition:
-                  StringLikeIfExists:
-                    organizations:ServicePrincipal: shield.amazonaws.com
-                Resource: !Sub arn:${AWS::Partition}:organizations::*:account/o-*/*
-
-        - PolicyName: sra-shield-advanced-policy-sns
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Sid: SNSPublish
-                Effect: Allow
-                Action:
-                  - sns:Publish
-                  - sns:PublishBatch
-                Resource: !Ref rshieldOrgTopic
-
         - PolicyName: sra-shield-advanced-policy-sqs
           PolicyDocument:
             Version: 2012-10-17
@@ -809,12 +733,12 @@ Resources:
               - Sid: SQSSendMessage
                 Effect: Allow
                 Action: sqs:SendMessage
-                Resource: !GetAtt rshieldOrgDLQ.Arn
+                Resource: !GetAtt rShieldOrgDLQ.Arn
       Tags:
         - Key: sra-solution
           Value: !Ref pSRASolutionName
 
-  rshieldOrgLambdaFunction:
+  rShieldOrgLambdaFunction:
     Type: AWS::Lambda::Function
     Metadata:
       cfn_nag:
@@ -835,7 +759,7 @@ Resources:
             comment: Environment variables are not sensitive.
     Properties:
       FunctionName: !Ref pShieldOrgLambdaFunctionName
-      Description: Configure shield for the Organization
+      Description: Configure Shield Advanced
       Architectures: !If
         - cUseGraviton
         - [arm64]
@@ -849,9 +773,9 @@ Resources:
         S3Bucket: !Ref pSRAStagingS3BucketName
         S3Key: !Sub ${pSRASolutionName}/lambda_code/${pSRASolutionName}.zip
       Layers:
-        - !Ref rshieldOrgLambdaLayer
+        - !Ref rShieldOrgLambdaLayer
       DeadLetterConfig:
-        TargetArn: !GetAtt rshieldOrgDLQ.Arn
+        TargetArn: !GetAtt rShieldOrgDLQ.Arn
       Environment:
         Variables:
           LOG_LEVEL: !Ref pLambdaLogLevel
@@ -861,7 +785,6 @@ Resources:
           DELEGATED_ADMIN_ACCOUNT_ID: !Ref pDelegatedAdminAccountId
           ENABLED_REGIONS: !Ref pEnabledRegions
           MANAGEMENT_ACCOUNT_ID: !Ref AWS::AccountId
-          SNS_TOPIC_ARN: !Ref rshieldOrgTopic
           CONFIGURE_DRT_TEAM_ACCESS: !Ref pConfigureDRTTeamAccess
           SHIELD_AUTO_RENEW: !Ref pShieldAutoRenew
           SHIELD_DRT_ROLE_NAME: !Ref pShieldDRTRoleName
@@ -874,9 +797,6 @@ Resources:
           SHIELD_DRT_LOG_BUCKETS: !Join
             - ','
             - !Ref pShieldDRTLogBuckets
-          SHIELD_DRT_EMERGENCY_CONTACTS: !Join
-            - ','
-            - !Ref pShieldDRTEmergencyContacts
           SHIELD_ENABLE_PROACTIVE_ENGAGEMENT: !Ref pShieldEnableProactiveEngagement
           SHIELD_PROACTIVE_ENGAGEMENT_PHONE_NUMBER: !Ref pShieldProactiveEngagementPhoneNumber
           SHIELD_PROACTIVE_ENGAGEMENT_EMAIL: !Ref pShieldProactiveEngagementEmail
@@ -925,7 +845,7 @@ Resources:
         - Key: sra-solution
           Value: !Ref pSRASolutionName
 
-  rshieldOrgLambdaLayer:
+  rShieldOrgLambdaLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
       Content:
@@ -938,7 +858,7 @@ Resources:
     Type: Custom::LambdaCustomResource
     Version: '1.0'
     Properties:
-      ServiceToken: !GetAtt rshieldOrgLambdaFunction.Arn
+      ServiceToken: !GetAtt rShieldOrgLambdaFunction.Arn
       CONFIGURATION_ROLE_NAME: !Ref pShieldConfigurationRoleName
       CONTROL_TOWER_REGIONS_ONLY: !Ref pControlTowerRegionsOnly
       DELEGATED_ADMIN_ACCOUNT_ID: !Ref pDelegatedAdminAccountId
@@ -955,9 +875,6 @@ Resources:
       SHIELD_DRT_LOG_BUCKETS: !Join
         - ','
         - !Ref pShieldDRTLogBuckets
-      SHIELD_DRT_EMERGENCY_CONTACTS: !Join
-        - ','
-        - !Ref pShieldDRTEmergencyContacts
       SHIELD_ENABLE_PROACTIVE_ENGAGEMENT: !Ref pShieldEnableProactiveEngagement
       SHIELD_PROACTIVE_ENGAGEMENT_PHONE_NUMBER: !Ref pShieldProactiveEngagementPhoneNumber
       SHIELD_PROACTIVE_ENGAGEMENT_EMAIL: !Ref pShieldProactiveEngagementEmail
@@ -1002,31 +919,31 @@ Resources:
       PROTECTION_GROUP_4_MEMBERS: !Join
         - ','
         - !Ref pProtectionGroup4Members
-  rshieldOrgTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      DisplayName: !Sub ${pSRASolutionName}-configuration
-      KmsMasterKeyId: !Sub arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/sns
-      Tags:
-        - Key: sra-solution
-          Value: !Ref pSRASolutionName
+  # rShieldOrgTopic:
+  #   Type: AWS::SNS::Topic
+  #   Properties:
+  #     DisplayName: !Sub ${pSRASolutionName}-configuration
+  #     KmsMasterKeyId: !Sub arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/sns
+  #     Tags:
+  #       - Key: sra-solution
+  #         Value: !Ref pSRASolutionName
 
-  rshieldOrgTopicLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt rshieldOrgLambdaFunction.Arn
-      Principal: sns.amazonaws.com
-      SourceArn: !Ref rshieldOrgTopic
+  # rShieldOrgTopicLambdaPermission:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     Action: lambda:InvokeFunction
+  #     FunctionName: !GetAtt rShieldOrgLambdaFunction.Arn
+  #     Principal: sns.amazonaws.com
+  #     SourceArn: !Ref rShieldOrgTopic
 
-  rshieldOrgTopicSubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Endpoint: !GetAtt rshieldOrgLambdaFunction.Arn
-      Protocol: lambda
-      TopicArn: !Ref rshieldOrgTopic
+  # rShieldOrgTopicSubscription:
+  #   Type: AWS::SNS::Subscription
+  #   Properties:
+  #     Endpoint: !GetAtt rShieldOrgLambdaFunction.Arn
+  #     Protocol: lambda
+  #     TopicArn: !Ref rShieldOrgTopic
 
-  rshieldOrgDLQ:
+  rShieldOrgDLQ:
     Type: AWS::SQS::Queue
     Properties:
       KmsMasterKeyId: alias/aws/sqs
@@ -1038,25 +955,25 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
 
-  rshieldOrgDLQPolicy:
+  rShieldOrgDLQPolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
-        - !Ref rshieldOrgDLQ
+        - !Ref rShieldOrgDLQ
       PolicyDocument:
         Statement:
           - Action: SQS:SendMessage
             Condition:
               ArnEquals:
                 aws:SourceArn:
-                  - !GetAtt rshieldOrgLambdaFunction.Arn
+                  - !GetAtt rShieldOrgLambdaFunction.Arn
             Effect: Allow
             Principal:
               Service: events.amazonaws.com
             Resource:
-              - !GetAtt rshieldOrgDLQ.Arn
+              - !GetAtt rShieldOrgDLQ.Arn
 
-  rshieldOrgDLQAlarmTopic:
+  rShieldOrgDLQAlarmTopic:
     Condition: cCreateDLQAlarm
     Type: AWS::SNS::Topic
     Properties:
@@ -1070,7 +987,7 @@ Resources:
         - Key: sra-solution
           Value: !Ref pSRASolutionName
 
-  rshieldOrgDLQAlarm:
+  rShieldOrgDLQAlarm:
     Condition: cCreateDLQAlarm
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -1079,21 +996,21 @@ Resources:
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:
         - Name: QueueName
-          Value: !GetAtt rshieldOrgDLQ.QueueName
+          Value: !GetAtt rShieldOrgDLQ.QueueName
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanThreshold
       AlarmActions:
-        - !Ref rshieldOrgDLQAlarmTopic
+        - !Ref rShieldOrgDLQAlarmTopic
       InsufficientDataActions:
-        - !Ref rshieldOrgDLQAlarmTopic
+        - !Ref rShieldOrgDLQAlarmTopic
 
   rPermissionForScheduledComplianceRuleToInvokeLambda:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt rshieldOrgLambdaFunction.Arn
+      FunctionName: !GetAtt rShieldOrgLambdaFunction.Arn
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt rScheduledComplianceRule.Arn
@@ -1109,7 +1026,7 @@ Resources:
         - !Sub rate(${pComplianceFrequency} days)
       State: ENABLED
       Targets:
-        - Arn: !GetAtt rshieldOrgLambdaFunction.Arn
+        - Arn: !GetAtt rShieldOrgLambdaFunction.Arn
           Id: !Ref pShieldOrgLambdaFunctionName
 
   rCrossRegionEventRuleRole:
@@ -1142,11 +1059,11 @@ Resources:
 Outputs:
   oshieldOrgLambdaFunctionArn:
     Description: SRA shield Lambda Function ARN
-    Value: !GetAtt rshieldOrgLambdaFunction.Arn
+    Value: !GetAtt rShieldOrgLambdaFunction.Arn
   oshieldOrgLambdaLogGroupArn:
     Condition: cCreateLambdaLogGroup
     Description: SRA shield Lambda Log Group ARN
-    Value: !GetAtt rshieldOrgLambdaLogGroup.Arn
+    Value: !GetAtt rShieldOrgLambdaLogGroup.Arn
   oshieldOrgLambdaRoleArn:
     Description: SRA shield Lambda Role ARN
     Value: !GetAtt rShieldOrgLambdaRole.Arn

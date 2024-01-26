@@ -76,11 +76,6 @@ Resources:
         Statement:
           - Effect: Allow
             Action: sts:AssumeRole
-            # COMMENT condition to test locally
-            # Condition:
-            #   StringEquals:
-            #     aws:PrincipalArn:
-            #       - !Sub arn:${AWS::Partition}:iam::${pManagementAccountId}:*/${pShieldOrgLambdaRoleName}/*
             Principal:
               AWS:
                 - !Sub arn:${AWS::Partition}:iam::${pManagementAccountId}:root
@@ -99,27 +94,23 @@ Resources:
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-              - Sid: OrganizationsListAccounts
+              - Sid: GetShieldResources
                 Effect: Allow
                 Action:
                   - route53:GetHostedZone
-                  # - cloudwatch:Describe*
-                  # - cloudwatch:Get*
-                  # - cloudwatch:List*
                   - cloudfront:GetDistribution
                   - globalaccelerator:ListAccelerators
                   - globalaccelerator:DescribeAccelerator
                 Resource:
                   - !Sub arn:${AWS::Partition}:cloudfront::*:*
                   - !Sub arn:${AWS::Partition}:route53:::hostedzone/*
-                  #- !Sub arn:${AWS::Partition}:cloudwatch:*:*:*:*
                   - !Sub arn:${AWS::Partition}:globalaccelerator::*:*
 
         - PolicyName: sra-shield-advanced-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-              - Sid: shieldAccess
+              - Sid: ShieldAccess
                 Effect: Allow
                 Action:
                   - shield:AssociateHealthCheck
@@ -139,11 +130,11 @@ Resources:
                   - !Sub arn:${AWS::Partition}:shield::${AWS::AccountId}:protection/*
                   - !Sub arn:${AWS::Partition}:shield::${AWS::AccountId}:protection-group/*
 
-        - PolicyName: sra-shield-advanced-policy1
+        - PolicyName: sra-shield-advanced-policy-no-resource-support
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-              - Sid: shieldAccess
+              - Sid: ShieldAccessContinued
                 Effect: Allow
                 Action:
                   - shield:AssociateDRTRole
@@ -155,12 +146,10 @@ Resources:
                   - shield:DeleteSubscription
                   - shield:DisableProactiveEngagement
                   - shield:DescribeSubscription
-                  #- shield:Describe*
                   - shield:DisassociateDRTLogBucket
                   - shield:DisassociateDRTRole
                   - shield:DisableApplicationLayerAutomaticResponse
                   - shield:DescribeEmergencyContactSettings
-                  # - elasticloadbalancing:DescribeLoadBalancers
                   - shield:EnableProactiveEngagement
                   - shield:EnableApplicationLayerAutomaticResponse
                   - shield:UpdateEmergencyContactSettings
@@ -168,15 +157,13 @@ Resources:
                   - shield:UpdateApplicationLayerAutomaticResponse
                   - shield:ListProtections
                   - shield:ListResourcesInProtectionGroup
-                  #- shield:Get*
-                  #- shield:List*
                 Resource: '*'
 
-        - PolicyName: sra-shield-dependant-iam-actions
+        - PolicyName: sra-shield-get-additional-resources
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-              - Sid: shieldAccess
+              - Sid: ShieldAccess
                 Effect: Allow
                 Action:
                   - s3:GetBucketPolicy
@@ -195,19 +182,6 @@ Resources:
                 Effect: Allow
                 Action: iam:GetRole
                 Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*
-
-              - Sid: AllowCreateServiceLinkedRole
-                Effect: Allow
-                Action: iam:CreateServiceLinkedRole
-                Condition:
-                  StringLike:
-                    iam:AWSServiceName: shield.amazonaws.com
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/shield.amazonaws.com/AWSServiceRoleForAmazonShield
-
-              - Sid: AllowPolicyActions
-                Effect: Allow
-                Action: iam:PutRolePolicy
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/shield.amazonaws.com/AWSServiceRoleForAmazonShield
 
               - Sid: AttachPolicy
                 Effect: Allow
@@ -228,10 +202,6 @@ Resources:
                   - iam:ListAttachedRolePolicies
                 Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/DRT-Access-Role
 
-              - Sid: AllowDeleteServiceLinkRole
-                Effect: Allow
-                Action: iam:DeleteServiceLinkedRole
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/shield.amazonaws.com/AWSServiceRoleForAmazonshield
       Tags:
         - Key: sra-solution
           Value: !Ref pSRASolutionName
